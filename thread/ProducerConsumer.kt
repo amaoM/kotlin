@@ -53,7 +53,7 @@ class EaterThread(name: String, table: Table, seed: Long) : Thread(name) {
 	override fun run() {
 		try {
 			while (true) {
-				val cake = this.table.take()
+				this.table.take()
 				Thread.sleep(random.nextInt(1000).toLong())
 			}
 		} catch (e: InterruptedException) {
@@ -66,6 +66,7 @@ class Table(count: Int) {
 	private var tail: Int
 	private var head: Int
 	private var count: Int
+	private val lock = java.lang.Object()
 	
 	init {
 		this.buffer = arrayOfNulls(count)
@@ -74,28 +75,30 @@ class Table(count: Int) {
 		this.count = 0
 	}
 	
-	@Synchronized
 	fun put(cake: String) {
-		println("${Thread.currentThread().getName()} puts $cake")
-		while (this.count >= this.buffer.size) {
-			(this as java.lang.Object).wait()
+		synchronized(lock) {
+			println("${Thread.currentThread().getName()} puts $cake")
+			while (this.count >= this.buffer.size) {
+				lock.wait()
+			}
+			this.buffer[this.tail] = cake
+			this.tail = (this.tail + 1) % this.buffer.size
+			this.count++
+			lock.notifyAll()
 		}
-		this.buffer[this.tail] = cake
-		this.tail = (this.tail + 1) % this.buffer.size
-		this.count++
-		(this as java.lang.Object).notifyAll()
 	}
 	
-	@Synchronized
 	fun take(): String? {
-		while (this.count <= 0) {
-			(this as java.lang.Object).wait()
+		synchronized(lock) {
+			while (this.count <= 0) {
+				lock.wait()
+			}
+			val cake = this.buffer[this.head]
+			this.head = (this.head + 1) % this.buffer.size
+			this.count--
+			lock.notifyAll()
+			println("${Thread.currentThread().getName()} takes $cake")
+			return cake
 		}
-		val cake = this.buffer[this.head]
-		this.head = (this.head + 1) % this.buffer.size
-		this.count--
-		(this as java.lang.Object).notifyAll()
-		println("${Thread.currentThread().getName()} takes $cake")
-		return cake
 	}
 }

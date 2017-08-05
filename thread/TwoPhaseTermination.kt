@@ -1,4 +1,4 @@
-package thread
+package thread.two.phase.termination
 
 fun main(args: Array<String>) {
 	println("main: BEGIN")

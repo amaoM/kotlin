@@ -1,4 +1,4 @@
-package thread
+package thread.single.threaded.execution
 
 import kotlin.concurrent.withLock
 
@@ -24,13 +24,13 @@ class Gate {
   }
 
   @Synchronized
-  fun toMessage(): String {
+  override fun toString(): String {
     return "No.${this.counter}: ${this.name}, ${this.address}"
   }
 
   fun check() {
     if (this.name.elementAt(0) != this.address.elementAt(0)) {
-      println("***** Broken ***** ${toMessage()}")
+      println("***** Broken ***** ${toString()}")
     }
   }
 }

@@ -1,4 +1,4 @@
-package thread
+package thread.read.write.lock
 
 import java.util.Random
 
@@ -83,7 +83,7 @@ class WriterThread(data: LockData, filter: String) : Thread() {
 		try {
 			while (true) {
 				val c = nextchar()
-				data.write(c)
+				this.data.write(c)
 				Thread.sleep(random.nextInt(3000).toLong())
 			}
 		} catch (e: InterruptedException) {
@@ -110,8 +110,7 @@ class ReaderThread(data: LockData) : Thread() {
 	override fun run() {
 		try {
 			while (true) {
-				val readbuf = this.data.read().map { c -> c}
-				println("${Thread.currentThread().getName()} reads ${readbuf}")
+				println("${Thread.currentThread().getName()} reads ${String(this.data.read())}")
 			}
 		} catch (e: InterruptedException) {
 		}
@@ -123,39 +122,44 @@ class ReadWriteLock {
 	private var waitingWriters = 0
 	private var writingWriters = 0
 	private var preferWriter = true
+	private val lock = java.lang.Object()
 	
-	@Synchronized
 	fun readLock() {
-		while(this.writingWriters > 0 || (this.preferWriter && this.waitingWriters > 0)) {
-			(this as java.lang.Object).wait()
-		}
-		this.readingReaders++
-	}
-	
-	@Synchronized
-	fun readUnlock() {
-		this.readingReaders--
-		this.preferWriter = true
-		(this as java.lang.Object).notifyAll()
-	}
-	
-	@Synchronized
-	fun writeLock() {
-		this.waitingWriters++
-		try {
-			while (this.readingReaders > 0 || this.writingWriters > 0) {
-				(this as java.lang.Object).wait()
+		synchronized(lock) {
+			while(this.writingWriters > 0 || (this.preferWriter && this.waitingWriters > 0)) {
+				lock.wait()
 			}
-		} finally {
-			this.waitingWriters--
+			this.readingReaders++
 		}
-		this.writingWriters++
 	}
 	
-	@Synchronized
+	fun readUnlock() {
+		synchronized(lock) {
+			this.readingReaders--
+			this.preferWriter = true
+			lock.notifyAll()
+		}
+	}
+	
+	fun writeLock() {
+		synchronized(lock) {
+			this.waitingWriters++
+			try {
+				while (this.readingReaders > 0 || this.writingWriters > 0) {
+					lock.wait()
+				}
+			} finally {
+				this.waitingWriters--
+			}
+			this.writingWriters++
+		}
+	}
+	
 	fun writeUnlock() {
-		this.writingWriters--
-		this.preferWriter = false
-		(this as java.lang.Object).notifyAll()
+		synchronized(lock) {
+			this.writingWriters--
+			this.preferWriter = false
+			lock.notifyAll()
+		}
 	}
 }

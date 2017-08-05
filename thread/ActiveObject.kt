@@ -116,6 +116,7 @@ class ActivationQueue() {
 	private var tail: Int
 	private var head: Int
 	private var count: Int
+	private val lock = java.lang.Object()
 	
 	init {
 		this.head = 0
@@ -123,33 +124,35 @@ class ActivationQueue() {
 		this.count = 0
 	}
 	
-	@Synchronized
 	fun putRequest(request: MethodRequest<String>) {
-		while (count >= MAX_METHOD_REQUEST) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (count >= MAX_METHOD_REQUEST) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			this.requestQueue.add(request)
+			this.tail = (this.tail + 1) % MAX_METHOD_REQUEST
+			this.count++
+			lock.notifyAll()
 		}
-		this.requestQueue.add(request)
-		this.tail = (this.tail + 1) % MAX_METHOD_REQUEST
-		this.count++
-		(this as java.lang.Object).notifyAll()
 	}
 	
-	@Synchronized
 	fun takeRequest(): MethodRequest<String> {
-		while (this.count <= 0) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (this.count <= 0) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			val request = this.requestQueue[this.head]
+			this.head = (this.head + 1) % MAX_METHOD_REQUEST
+			this.count--
+			lock.notifyAll()
+			return request
 		}
-		val request = this.requestQueue[this.head]
-		this.head = (this.head + 1) % MAX_METHOD_REQUEST
-		this.count--
-		(this as java.lang.Object).notifyAll()
-		return request
 	}
 }
 
@@ -165,7 +168,12 @@ abstract class MethodRequest<T>(servant: Servant, future: FutureResult<T>?) {
 	abstract fun execute()
 }
 
-class MakeStringRequest(servant: Servant, future: FutureResult<String>, count: Int, fillchar: Char) : MethodRequest<String>(servant, future) {
+class MakeStringRequest(
+		servant: Servant,
+		future: FutureResult<String>,
+		count: Int,
+		fillchar: Char
+) : MethodRequest<String>(servant, future) {
 	private var count: Int
 	private val fillchar: Char
 	
@@ -199,23 +207,26 @@ abstract class Result<T> {
 class FutureResult<T> : Result<T>() {
 	private var result: Result<T>? = null
 	private var ready = false
+	private val lock = java.lang.Object()
 	
-	@Synchronized
 	fun setResult(result: Result<T>) {
-		this.result = result
-		this.ready = true
-		(this as java.lang.Object).notifyAll()
+		synchronized(lock) {
+			this.result = result
+			this.ready = true
+			lock.notifyAll()
+		}
 	}
 	
-	@Synchronized
 	override fun getResultValue(): T? {
-		while (!this.ready) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (!this.ready) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			return this.result?.getResultValue()
 		}
-		return this.result?.getResultValue()
 	}
 }
 

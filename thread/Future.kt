@@ -1,9 +1,11 @@
-package thread
+package thread.future
+
+import java.util.concurrent.locks.ReentrantLock
 
 fun main(args: Array<String>) {
 	println("main BEGIN")
 	
-	val host = MyHost()
+	val host = Host()
 	
 	val data1 = host.request(10, 'A')
 	val data2 = host.request(20, 'B')
@@ -24,8 +26,8 @@ fun main(args: Array<String>) {
 	println("main END")
 }
 
-class MyHost {
-	fun request(count: Int, c: Char): IData {
+class Host {
+	fun request(count: Int, c: Char): Data {
 		println("    request($count, $c) BEGIN")
 		
 		val future = FutureData()
@@ -43,37 +45,40 @@ class MyHost {
 	}
 }
 
-interface IData {
+interface Data {
 	fun getContent(): String?
 }
 
-class FutureData : IData {
+class FutureData : Data {
 	private var realdata: RealData? = null
 	private var ready = false
+	private val lock = java.lang.Object()
 	
-	@Synchronized
 	fun setRealData(realdata: RealData) {
-		if (this.ready) {
-			return
+		synchronized(lock) {
+			if (this.ready) {
+				return
+			}
+			this.realdata = realdata
+			this.ready = true
+			this.lock.notifyAll()
 		}
-		this.realdata = realdata
-		this.ready = true
-		(this as java.lang.Object).notifyAll()
 	}
 	
-	@Synchronized
 	override fun getContent(): String? {
-		while (!this.ready) {
+		synchronized(lock) {
+			while (!this.ready) {
 			try {
-				(this as java.lang.Object).wait()
+				this.lock.wait()
 			} catch (e: InterruptedException) {
 			}
 		}
 		return this.realdata?.getContent()
+		}
 	}
 }
 
-class RealData(count: Int, c: Char) : IData {
+class RealData(count: Int, c: Char) : Data {
 	private val content: String
 	
 	init {

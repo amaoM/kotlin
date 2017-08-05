@@ -1,16 +1,16 @@
-package thread
+package thread.worker.thread
 
 import java.util.Random
 
 fun main(args: Array<String>) {
 	val channel = Channel(5)
 	channel.startWorkers()
-	MyClientThread("Alice", channel).start()
-	MyClientThread("Bobby", channel).start()
-	MyClientThread("Chris", channel).start()
+	ClientThread("Alice", channel).start()
+	ClientThread("Bobby", channel).start()
+	ClientThread("Chris", channel).start()
 }
 
-class MyClientThread(name: String, channel: Channel) : Thread(name) {
+class ClientThread(name: String, channel: Channel) : Thread(name) {
 	private val channel: Channel
 	
 	companion object {
@@ -25,7 +25,7 @@ class MyClientThread(name: String, channel: Channel) : Thread(name) {
 		try {
 			for(i in 0..10000) {
 				val request = MyRequest(getName(), i)
-				channel.putRequest(request)
+				this.channel.putRequest(request)
 				Thread.sleep(random.nextInt(1000).toLong())
 			}
 		} catch (e: InterruptedException) {
@@ -48,7 +48,7 @@ class MyRequest(name: String, number: Int) {
 	}
 	
 	fun execute() {
-		println("${Thread.currentThread().getName()} executes ${toMessage()}")
+		println("${Thread.currentThread().getName()} executes ${toString()}")
 		try {
 			Thread.sleep(random.nextInt(1000).toLong())
 		} catch (e: InterruptedException) {
@@ -56,7 +56,7 @@ class MyRequest(name: String, number: Int) {
 		}
 	}
 	
-	fun toMessage(): String {
+	override fun toString(): String {
 		return "[ Request from ${this.name} No. $number ]"
 	}
 }
@@ -68,6 +68,7 @@ class Channel(threads: Int) {
 	private var count: Int
 	private var threads: Int
 	private val threadPool = ArrayList<WorkerThread>()
+	private val lock = java.lang.Object()
 	
 	companion object {
 		val MAX_REQUEST = 100
@@ -90,33 +91,35 @@ class Channel(threads: Int) {
 		}
 	}
 	
-	@Synchronized
 	fun putRequest(request: MyRequest) {
-		while (this.count >= this.threads) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (this.count >= this.threads) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			this.reqeustQueue.add(request)
+			this.tail = (this.tail + 1) % this.reqeustQueue.size
+			this.count++
+			lock.notifyAll()
 		}
-		this.reqeustQueue.add(request)
-		this.tail = (this.tail + 1) % this.reqeustQueue.size
-		this.count++
-		(this as java.lang.Object).notifyAll()
 	}
 	
-	@Synchronized
 	fun takeRequest(): MyRequest {
-		while (this.count <= 0) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (this.count <= 0) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			val request = this.reqeustQueue[this.head]
+			this.head = (this.head + 1) % this.reqeustQueue.size
+			this.count--
+			lock.notifyAll()
+			return request
 		}
-		val request = this.reqeustQueue[this.head]
-		this.head = (this.head + 1) % this.reqeustQueue.size
-		this.count--
-		(this as java.lang.Object).notifyAll()
-		return request
 	}
 }
 

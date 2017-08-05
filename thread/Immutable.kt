@@ -1,4 +1,4 @@
-package thread
+package thread.immutable
 
 fun main(args: Array<String>) {
   val alice = Person("Alice", "Alaska")
@@ -16,7 +16,7 @@ class Person(name: String, address: String) {
     this.address = address
   }
 
-  fun toMessage(): String = "[ Person: name = ${this.name}, address = ${this.address} ]"
+  override fun toString(): String = "[ Person: name = ${this.name}, address = ${this.address} ]"
 }
 
 class PrintPersonThread(person: Person) : Thread() {

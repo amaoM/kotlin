@@ -1,4 +1,4 @@
-package thread
+package thread.guarded.suspension
 
 import java.util.*
 import java.lang.*
@@ -24,22 +24,25 @@ class Request(name: String) {
 
 class RequestQueue() {
 	private var queue: LinkedList<Request> = LinkedList<Request>()
+	private val lock = java.lang.Object()
 	
-	@Synchronized
 	fun getRequest(): Request {
-		while (this.queue.peek() == null) {
-			try {
-				(this as java.lang.Object).wait()
-			} catch (e: InterruptedException) {
+		synchronized(lock) {
+			while (this.queue.peek() == null) {
+				try {
+					lock.wait()
+				} catch (e: InterruptedException) {
+				}
 			}
+			return this.queue.remove()
 		}
-		return this.queue.remove()
 	}
 	
-	@Synchronized
 	fun putRequest(request: Request) {
-		this.queue.offer(request)
-		(this as java.lang.Object).notifyAll()
+		synchronized(lock) {
+			this.queue.offer(request)
+			lock.notifyAll()
+		}
 	}
 }
 

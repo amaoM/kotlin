@@ -1,4 +1,4 @@
-package thread
+package thread.thread.per.message
 
 fun main(args: Array<String>) {
 	println("main BEGIN")
